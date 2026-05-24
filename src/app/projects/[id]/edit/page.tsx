@@ -34,9 +34,16 @@ export default async function EditProjectPage({
       </Link>
 
       <h1 className="mb-1 text-2xl font-semibold tracking-tight">Editar proyecto</h1>
-      <p className="mb-8 text-sm text-muted-foreground">
+      <p className="mb-4 text-sm text-muted-foreground">
         Versión {project.version} · Creado {new Date(project.created_at).toLocaleString("es-CR")}
       </p>
+
+      <Link
+        href={`/projects/${project.id}/elicit`}
+        className="mb-8 inline-flex items-center gap-2 rounded-md border bg-card px-3 py-2 text-sm font-medium shadow-sm hover:bg-accent"
+      >
+        → Ir a la elicitación
+      </Link>
 
       <EditProjectForm project={project} />
     </div>
