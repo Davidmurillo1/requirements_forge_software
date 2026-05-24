@@ -1,0 +1,11 @@
+node_modules
+.next
+out
+build
+coverage
+public
+*.log
+*.lock
+.env*
+src/lib/db/types.ts
+supabase/migrations
