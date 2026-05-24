@@ -4,6 +4,7 @@ import Anthropic, { APIError } from "@anthropic-ai/sdk";
 import type { MessageParam } from "@anthropic-ai/sdk/resources/messages";
 
 import { getAiEnv } from "@/lib/ai/env";
+import { log } from "@/lib/ai/log";
 import {
   SUBMIT_TURN_TOOL,
   submitTurnPayloadSchema,
@@ -105,6 +106,7 @@ export async function callModel(input: CallModelInput): Promise<CallModelResult>
   let lastError: AiCallError | null = null;
 
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    const startedAt = Date.now();
     try {
       const response = await c.messages.create({
         model: ANTHROPIC_MODEL,
@@ -114,6 +116,8 @@ export async function callModel(input: CallModelInput): Promise<CallModelResult>
         tools: [SUBMIT_TURN_TOOL],
         tool_choice: { type: "tool", name: SUBMIT_TURN_TOOL.name },
       });
+
+      const latencyMs = Date.now() - startedAt;
 
       const tokenUsage: TokenUsage = {
         input: response.usage.input_tokens,
@@ -144,11 +148,28 @@ export async function callModel(input: CallModelInput): Promise<CallModelResult>
         );
       }
 
+      log.info("ai.call.success", {
+        model: response.model,
+        attempt,
+        latencyMs,
+        inputTokens: tokenUsage.input,
+        outputTokens: tokenUsage.output,
+      });
+
       return { payload: parsed.data, tokenUsage, rawText };
     } catch (err) {
+      const latencyMs = Date.now() - startedAt;
       const e = classify(err);
       lastError = e;
-      if (!isRetryable(e.code) || attempt === MAX_ATTEMPTS) {
+      const willRetry = isRetryable(e.code) && attempt < MAX_ATTEMPTS;
+      log.warn("ai.call.failure", {
+        model: ANTHROPIC_MODEL,
+        attempt,
+        latencyMs,
+        code: e.code,
+        retrying: willRetry,
+      });
+      if (!willRetry) {
         throw e;
       }
       const jitter = 1 + (Math.random() - 0.5) * 0.5; // ±25%

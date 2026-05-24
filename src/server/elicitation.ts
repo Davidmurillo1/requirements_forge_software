@@ -5,6 +5,7 @@ import { z } from "zod";
 
 import { AiCallError, callModel } from "@/lib/ai/anthropic";
 import { buildTurnContext, loadActiveSession } from "@/lib/ai/context";
+import { log } from "@/lib/ai/log";
 import {
   elicitationSectionSchema,
   turnRequestSchema,
@@ -97,6 +98,11 @@ export async function startSession(
     }
   }
 
+  log.info("elicitation.startSession", {
+    projectId: project.id,
+    sessionId,
+    reused: Boolean(existing),
+  });
   revalidatePath(`/projects/${project.id}/elicit`);
   return { ok: true, data: { sessionId } };
 }
@@ -145,7 +151,10 @@ export async function sendTurn(
       insertUserError.code === "23505" ||
       /duplicate key|unique/i.test(insertUserError.message)
     ) {
-      // Ya procesado: no generar otro turno del motor.
+      log.info("elicitation.sendTurn.idempotent_skip", {
+        sessionId: session.id,
+        clientRequestId: parsed.data.clientRequestId,
+      });
       revalidatePath(`/projects/${session.project_id}/elicit`);
       return { ok: true, data: { engineTurnId: null } };
     }
@@ -155,8 +164,17 @@ export async function sendTurn(
   const engineResult = await generateAndPersistEngineTurn(supabase, session.id);
   revalidatePath(`/projects/${session.project_id}/elicit`);
   if (!engineResult.ok) {
+    log.warn("elicitation.sendTurn.engine_failed", {
+      sessionId: session.id,
+      code: engineResult.error.code,
+    });
     return err(engineResult.error.code, engineResult.error.message);
   }
+  log.info("elicitation.sendTurn.ok", {
+    sessionId: session.id,
+    section: session.current_section,
+    engineTurnId: engineResult.data.engineTurnId,
+  });
   return { ok: true, data: { engineTurnId: engineResult.data.engineTurnId } };
 }
 
@@ -244,6 +262,11 @@ export async function jumpToSection(
   // Genera primera pregunta de la nueva sección.
   await generateAndPersistEngineTurn(supabase, session.id);
 
+  log.info("elicitation.jumpToSection", {
+    sessionId: session.id,
+    from: previous,
+    to: parsed.data.section,
+  });
   revalidatePath(`/projects/${session.project_id}/elicit`);
   return { ok: true, data: { section: parsed.data.section } };
 }
@@ -294,6 +317,11 @@ export async function resolveIssue(
     return err("db_error", updateError.message);
   }
 
+  log.info("elicitation.resolveIssue", {
+    issueId: parsed.data.issueId,
+    action: parsed.data.action,
+    projectId: issue.project_id,
+  });
   revalidatePath(`/projects/${issue.project_id}/elicit`);
   return { ok: true, data: { issueId: parsed.data.issueId } };
 }
@@ -319,8 +347,70 @@ export async function closeSession(
     .eq("id", session.id);
   if (updateError) return err("db_error", updateError.message);
 
+  log.info("elicitation.closeSession", {
+    sessionId: session.id,
+    projectId: session.project_id,
+  });
   revalidatePath(`/projects/${session.project_id}/elicit`);
   return { ok: true, data: { sessionId: session.id } };
+}
+
+const listTurnsSchema = z.object({
+  sessionId: z.string().uuid().optional(),
+  projectId: z.string().uuid().optional(),
+  section: elicitationSectionSchema.optional(),
+  limit: z.number().int().min(1).max(200).default(50),
+  offset: z.number().int().min(0).default(0),
+});
+
+export type TurnSummary = Pick<
+  Database["public"]["Tables"]["turns"]["Row"],
+  | "id"
+  | "session_id"
+  | "project_id"
+  | "actor"
+  | "role"
+  | "section"
+  | "payload"
+  | "status"
+  | "error_code"
+  | "created_at"
+>;
+
+export async function listTurns(
+  input: z.infer<typeof listTurnsSchema>,
+): Promise<ElicitationActionResult<{ turns: TurnSummary[] }>> {
+  const parsed = listTurnsSchema.safeParse(input);
+  if (!parsed.success) {
+    return err("bad_input", parsed.error.issues[0]?.message ?? "Input inválido");
+  }
+  if (!parsed.data.sessionId && !parsed.data.projectId) {
+    return err("bad_input", "Debe proveerse sessionId o projectId.");
+  }
+
+  const supabase = await createClient();
+  let query = supabase
+    .from("turns")
+    .select(
+      "id, session_id, project_id, actor, role, section, payload, status, error_code, created_at",
+    )
+    .order("created_at", { ascending: true })
+    .range(parsed.data.offset, parsed.data.offset + parsed.data.limit - 1);
+
+  if (parsed.data.sessionId) {
+    query = query.eq("session_id", parsed.data.sessionId);
+  }
+  if (parsed.data.projectId) {
+    query = query.eq("project_id", parsed.data.projectId);
+  }
+  if (parsed.data.section) {
+    query = query.eq("section", parsed.data.section);
+  }
+
+  const { data, error: queryError } = await query;
+  if (queryError) return err("db_error", queryError.message);
+
+  return { ok: true, data: { turns: (data ?? []) as TurnSummary[] } };
 }
 
 const retryFailedSchema = z.object({
@@ -398,6 +488,14 @@ async function generateAndPersistEngineTurn(
 
     await applySectionAdvance(supabase, session.project_id, session.current_section, payload);
 
+    log.info("elicitation.engineTurn.persisted", {
+      sessionId: session.id,
+      turnId: engineTurn.id,
+      section: session.current_section,
+      detectedIssues: payload.detected_issues.length,
+      sectionComplete: payload.section_advance.complete,
+      completionScore: payload.section_advance.completion_score,
+    });
     return { ok: true, data: { engineTurnId: engineTurn.id } };
   } catch (e) {
     const aiErr = e instanceof AiCallError ? e : null;
@@ -415,6 +513,11 @@ async function generateAndPersistEngineTurn(
       error_code: code,
     });
 
+    log.error("elicitation.engineTurn.failed", {
+      sessionId: session.id,
+      section: session.current_section,
+      code,
+    });
     return err(code, message);
   }
 }
