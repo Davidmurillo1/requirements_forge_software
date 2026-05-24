@@ -217,6 +217,79 @@ export type Database = {
           },
         ]
       }
+      detected_issues: {
+        Row: {
+          body: string
+          created_at: string
+          id: string
+          project_id: string
+          resolution_note: string | null
+          resolved_at: string | null
+          resolved_by: string | null
+          session_id: string | null
+          severity: Database["public"]["Enums"]["issue_severity"]
+          status: Database["public"]["Enums"]["issue_status"]
+          title: string
+          turn_id: string | null
+          type: Database["public"]["Enums"]["issue_type"]
+          updated_at: string
+        }
+        Insert: {
+          body: string
+          created_at?: string
+          id?: string
+          project_id: string
+          resolution_note?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          session_id?: string | null
+          severity?: Database["public"]["Enums"]["issue_severity"]
+          status?: Database["public"]["Enums"]["issue_status"]
+          title: string
+          turn_id?: string | null
+          type: Database["public"]["Enums"]["issue_type"]
+          updated_at?: string
+        }
+        Update: {
+          body?: string
+          created_at?: string
+          id?: string
+          project_id?: string
+          resolution_note?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          session_id?: string | null
+          severity?: Database["public"]["Enums"]["issue_severity"]
+          status?: Database["public"]["Enums"]["issue_status"]
+          title?: string
+          turn_id?: string | null
+          type?: Database["public"]["Enums"]["issue_type"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "detected_issues_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "detected_issues_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "sessions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "detected_issues_turn_id_fkey"
+            columns: ["turn_id"]
+            isOneToOne: false
+            referencedRelation: "turns"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       entities: {
         Row: {
           created_at: string
@@ -505,6 +578,38 @@ export type Database = {
           },
         ]
       }
+      project_section_progress: {
+        Row: {
+          completion_score: number
+          last_updated_at: string
+          project_id: string
+          section: Database["public"]["Enums"]["elicitation_section"]
+          status: Database["public"]["Enums"]["section_status"]
+        }
+        Insert: {
+          completion_score?: number
+          last_updated_at?: string
+          project_id: string
+          section: Database["public"]["Enums"]["elicitation_section"]
+          status?: Database["public"]["Enums"]["section_status"]
+        }
+        Update: {
+          completion_score?: number
+          last_updated_at?: string
+          project_id?: string
+          section?: Database["public"]["Enums"]["elicitation_section"]
+          status?: Database["public"]["Enums"]["section_status"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "project_section_progress_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       projects: {
         Row: {
           client_name: string | null
@@ -625,33 +730,42 @@ export type Database = {
       }
       sessions: {
         Row: {
+          closed_at: string | null
           created_at: string
+          current_section: Database["public"]["Enums"]["elicitation_section"]
           ended_at: string | null
           id: string
           mode: Database["public"]["Enums"]["project_mode"]
           notes: string | null
           project_id: string
           started_at: string
+          status: Database["public"]["Enums"]["session_status"]
           updated_at: string
         }
         Insert: {
+          closed_at?: string | null
           created_at?: string
+          current_section?: Database["public"]["Enums"]["elicitation_section"]
           ended_at?: string | null
           id?: string
           mode: Database["public"]["Enums"]["project_mode"]
           notes?: string | null
           project_id: string
           started_at?: string
+          status?: Database["public"]["Enums"]["session_status"]
           updated_at?: string
         }
         Update: {
+          closed_at?: string | null
           created_at?: string
+          current_section?: Database["public"]["Enums"]["elicitation_section"]
           ended_at?: string | null
           id?: string
           mode?: Database["public"]["Enums"]["project_mode"]
           notes?: string | null
           project_id?: string
           started_at?: string
+          status?: Database["public"]["Enums"]["session_status"]
           updated_at?: string
         }
         Relationships: [
@@ -704,6 +818,66 @@ export type Database = {
             columns: ["project_id"]
             isOneToOne: false
             referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      turns: {
+        Row: {
+          actor: Database["public"]["Enums"]["session_actor"]
+          client_request_id: string | null
+          created_at: string
+          error_code: string | null
+          id: string
+          payload: Json
+          project_id: string
+          role: Database["public"]["Enums"]["turn_role"]
+          section: Database["public"]["Enums"]["elicitation_section"]
+          session_id: string
+          status: Database["public"]["Enums"]["turn_status"]
+          token_usage: Json | null
+        }
+        Insert: {
+          actor: Database["public"]["Enums"]["session_actor"]
+          client_request_id?: string | null
+          created_at?: string
+          error_code?: string | null
+          id?: string
+          payload: Json
+          project_id: string
+          role: Database["public"]["Enums"]["turn_role"]
+          section: Database["public"]["Enums"]["elicitation_section"]
+          session_id: string
+          status?: Database["public"]["Enums"]["turn_status"]
+          token_usage?: Json | null
+        }
+        Update: {
+          actor?: Database["public"]["Enums"]["session_actor"]
+          client_request_id?: string | null
+          created_at?: string
+          error_code?: string | null
+          id?: string
+          payload?: Json
+          project_id?: string
+          role?: Database["public"]["Enums"]["turn_role"]
+          section?: Database["public"]["Enums"]["elicitation_section"]
+          session_id?: string
+          status?: Database["public"]["Enums"]["turn_status"]
+          token_usage?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "turns_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "turns_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "sessions"
             referencedColumns: ["id"]
           },
         ]
@@ -765,8 +939,28 @@ export type Database = {
         | "integration"
         | "session"
         | "other"
+      elicitation_section:
+        | "project_context"
+        | "stakeholders_personas"
+        | "scope"
+        | "business_process"
+        | "user_stories"
+        | "nfrs"
+        | "domain_data"
+        | "integrations"
+        | "ui_ux"
+        | "constraints_assumptions_risks"
+        | "glossary"
       integration_criticality: "low" | "medium" | "high"
       integration_direction: "inbound" | "outbound" | "bidirectional"
+      issue_severity: "info" | "warning" | "error"
+      issue_status: "open" | "resolved" | "dismissed"
+      issue_type:
+        | "vagueness"
+        | "contradiction"
+        | "missing_cross_cutting"
+        | "missing_metric"
+        | "undefined_glossary"
       nfr_category:
         | "functionality"
         | "usability"
@@ -780,9 +974,13 @@ export type Database = {
       project_status: "draft" | "active" | "exported" | "archived"
       risk_level: "low" | "medium" | "high"
       scope_kind: "in" | "out"
+      section_status: "not_started" | "in_progress" | "incomplete" | "complete"
       session_actor: "engine" | "consultant" | "stakeholder"
+      session_status: "active" | "closed" | "abandoned"
       stakeholder_influence: "low" | "medium" | "high"
       story_priority: "must" | "should" | "could" | "wont"
+      turn_role: "question" | "answer" | "followup" | "system" | "meta"
+      turn_status: "ok" | "failed"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -919,8 +1117,30 @@ export const Constants = {
         "session",
         "other",
       ],
+      elicitation_section: [
+        "project_context",
+        "stakeholders_personas",
+        "scope",
+        "business_process",
+        "user_stories",
+        "nfrs",
+        "domain_data",
+        "integrations",
+        "ui_ux",
+        "constraints_assumptions_risks",
+        "glossary",
+      ],
       integration_criticality: ["low", "medium", "high"],
       integration_direction: ["inbound", "outbound", "bidirectional"],
+      issue_severity: ["info", "warning", "error"],
+      issue_status: ["open", "resolved", "dismissed"],
+      issue_type: [
+        "vagueness",
+        "contradiction",
+        "missing_cross_cutting",
+        "missing_metric",
+        "undefined_glossary",
+      ],
       nfr_category: [
         "functionality",
         "usability",
@@ -935,9 +1155,13 @@ export const Constants = {
       project_status: ["draft", "active", "exported", "archived"],
       risk_level: ["low", "medium", "high"],
       scope_kind: ["in", "out"],
+      section_status: ["not_started", "in_progress", "incomplete", "complete"],
       session_actor: ["engine", "consultant", "stakeholder"],
+      session_status: ["active", "closed", "abandoned"],
       stakeholder_influence: ["low", "medium", "high"],
       story_priority: ["must", "should", "could", "wont"],
+      turn_role: ["question", "answer", "followup", "system", "meta"],
+      turn_status: ["ok", "failed"],
     },
   },
 } as const
