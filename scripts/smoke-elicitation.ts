@@ -311,6 +311,67 @@ async function main() {
       "Sección nueva queda 'in_progress'",
     );
 
+    console.log(
+      paint(
+        "\n[7/7] Regresión: salto deja turno meta, contexto del modelo NO debe romperse",
+        "cyan",
+      ),
+    );
+    // Reproduce el bug original: jumpToSection inserta un turno meta en la
+    // nueva sección. Si el contexto enviado al modelo lo incluye como
+    // 'assistant', Anthropic responde 400 ("This model does not support
+    // assistant message prefill"). El fix excluye role='meta' de
+    // loadRecentTurns.
+    await supabase.from("turns").insert({
+      session_id: session.id,
+      project_id: session.project_id,
+      actor: "engine",
+      role: "meta",
+      section: "stakeholders_personas",
+      payload: { kind: "section_jump", from: "nfrs", to: "stakeholders_personas" },
+      status: "ok",
+    });
+    const { data: postJumpTurns } = await supabase
+      .from("turns")
+      .select("role, actor")
+      .eq("session_id", session.id)
+      .eq("section", "stakeholders_personas")
+      .eq("status", "ok")
+      .neq("role", "meta")
+      .order("created_at", { ascending: true });
+    check(
+      (postJumpTurns ?? []).every((t) => t.role !== "meta"),
+      "loadRecentTurns excluye turnos role='meta' en la sección destino",
+    );
+    // Simula lo que buildTurnContext armaría: solo project facts + bootstrap
+    // user message para la nueva sección (porque postJumpTurns está vacío).
+    const newSectionSystem = buildSystemPrompt("stakeholders_personas");
+    const newSectionMessages: Anthropic.Messages.MessageParam[] = [
+      {
+        role: "user",
+        content: "Project facts conocidos hasta ahora: (aún no hay facts capturados).",
+      },
+      {
+        role: "user",
+        content:
+          '(Inicio de sesión en sección "stakeholders_personas". Formula la primera pregunta apropiada.)',
+      },
+    ];
+    try {
+      const afterJump = await callModelDirect(
+        anthropic,
+        model,
+        newSectionSystem,
+        newSectionMessages,
+      );
+      check(
+        typeof afterJump.payload.question === "string" && afterJump.payload.question.length > 0,
+        "Tras el salto, el modelo responde con submit_turn.question (no 400)",
+      );
+    } catch (e) {
+      check(false, `Llamada al modelo post-salto falló: ${e instanceof Error ? e.message : e}`);
+    }
+
     console.log(paint("\n[cleanup] Borrar proyecto temporal en cascada", "cyan"));
     await supabase.from("projects").delete().eq("id", project.id);
     projectId = null;

@@ -61,11 +61,23 @@ ${projectFacts || "(aún no hay facts capturados)"}`,
     messages.push(turnToMessage(t));
   }
 
-  // Si no hay turnos previos (sesión recién creada), dispara la primera pregunta.
+  // Si no hay turnos previos en esta sección (sesión recién creada o salto),
+  // dispara la primera pregunta.
   if (recentTurns.length === 0) {
     messages.push({
       role: "user",
       content: `(Inicio de sesión en sección "${session.current_section}". Formula la primera pregunta apropiada.)`,
+    });
+  }
+
+  // Defensa: la API de Anthropic exige que el último mensaje sea 'user'.
+  // Si por cualquier motivo el último turno traído fue del motor, anexamos
+  // una nota del usuario para cerrar el array como user → assistant.
+  const last = messages[messages.length - 1];
+  if (last && last.role === "assistant") {
+    messages.push({
+      role: "user",
+      content: "(Continúa la sección. Formula la siguiente pregunta.)",
     });
   }
 
@@ -91,12 +103,17 @@ async function loadRecentTurns(
   sessionId: string,
   section: Section,
 ): Promise<TurnRow[]> {
+  // Excluye 'meta': son eventos del sistema (saltos, fallos del SDK) y NO
+  // deben enviarse al modelo. Si entrasen como assistant dejarían la
+  // conversación cerrada con un mensaje del motor y la API rechazaría
+  // (assistant message prefill no soportado).
   const { data } = await supabase
     .from("turns")
     .select("role, actor, status, payload, created_at")
     .eq("session_id", sessionId)
     .eq("section", section)
     .eq("status", "ok")
+    .neq("role", "meta")
     .order("created_at", { ascending: false })
     .limit(TURN_WINDOW);
   if (!data) return [];
