@@ -24,7 +24,7 @@ create type public.annotation_target_kind as enum (
 );
 
 ------------------------------------------------------------
--- FUNCIONES AUXILIARES
+-- TRIGGER FUNCTION (sin referencias a tablas)
 ------------------------------------------------------------
 create or replace function public.set_updated_at()
 returns trigger
@@ -38,27 +38,9 @@ begin
 end;
 $$;
 
--- Helper de ownership: SECURITY DEFINER para no entrar en recursión de RLS,
--- search_path vacío para evitar mutable_search_path warning, STABLE porque solo
--- depende del request actual. auth.uid() y la tabla projects se cualifican.
-create or replace function public.user_owns_project(p_project_id uuid)
-returns boolean
-language sql
-security definer
-set search_path = ''
-stable
-as $$
-  select exists (
-    select 1 from public.projects p
-    where p.id = p_project_id
-      and p.owner_id = (select auth.uid())
-  )
-$$;
-revoke all on function public.user_owns_project(uuid) from public;
-grant execute on function public.user_owns_project(uuid) to authenticated;
-
 ------------------------------------------------------------
--- PROJECTS (raíz)
+-- PROJECTS (raíz) — debe existir antes del helper user_owns_project,
+-- porque SQL functions resuelven referencias en CREATE FUNCTION time.
 ------------------------------------------------------------
 create table public.projects (
   id uuid primary key default gen_random_uuid(),
@@ -93,6 +75,28 @@ create policy projects_update_own on public.projects
 create policy projects_delete_own on public.projects
   for delete to authenticated
   using (owner_id = (select auth.uid()));
+
+------------------------------------------------------------
+-- HELPER user_owns_project: ahora projects existe.
+-- SECURITY DEFINER para no entrar en recursión de RLS, search_path vacío
+-- para evitar mutable_search_path warning, STABLE porque solo depende del
+-- request actual. auth.uid() y projects se cualifican.
+------------------------------------------------------------
+create or replace function public.user_owns_project(p_project_id uuid)
+returns boolean
+language sql
+security definer
+set search_path = ''
+stable
+as $$
+  select exists (
+    select 1 from public.projects p
+    where p.id = p_project_id
+      and p.owner_id = (select auth.uid())
+  )
+$$;
+revoke all on function public.user_owns_project(uuid) from public;
+grant execute on function public.user_owns_project(uuid) to authenticated;
 
 ------------------------------------------------------------
 -- STAKEHOLDERS
