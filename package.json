@@ -9,7 +9,8 @@
     "lint": "eslint --max-warnings 0",
     "type-check": "tsc --noEmit",
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md,mjs,css}\"",
-    "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,md,mjs,css}\""
+    "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,md,mjs,css}\"",
+    "smoke:elicitation": "tsx scripts/smoke-elicitation.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "0.98.0",
@@ -38,7 +39,9 @@
     "eslint-config-next": "16.2.6",
     "prettier": "^3",
     "prettier-plugin-tailwindcss": "^0.6",
+    "server-only": "^0.0.1",
     "tailwindcss": "^4",
+    "tsx": "^4.22.3",
     "typescript": "^5"
   }
 }
