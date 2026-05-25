@@ -313,7 +313,62 @@ async function main() {
 
     console.log(
       paint(
-        "\n[7/7] Regresión: salto deja turno meta, contexto del modelo NO debe romperse",
+        "\n[7/8] Regresión: followups deben alinearse con la 'question' del MISMO turno",
+        "cyan",
+      ),
+    );
+    // Reproduce el reporte del usuario: en el turno previo el motor cerró el
+    // rol "administrador" y ahora pasa al "directivo". Los followups del nuevo
+    // turno NO deben mencionar "administrador" — deben ser sub-preguntas del
+    // nuevo foco. Antes del refuerzo del system prompt, el modelo arrastraba
+    // followups sobre el rol anterior.
+    const stakeholdersSystem = buildSystemPrompt("stakeholders_personas");
+    const followupCoherenceMessages: Anthropic.Messages.MessageParam[] = [
+      {
+        role: "user",
+        content: "Project facts conocidos hasta ahora: (aún no hay facts capturados).",
+      },
+      {
+        role: "user",
+        content:
+          '(Inicio de sesión en sección "stakeholders_personas". Formula la primera pregunta apropiada.)',
+      },
+      {
+        role: "assistant",
+        content:
+          "¿Qué rol tiene el administrador en el sistema y cuáles son sus responsabilidades clave?",
+      },
+      {
+        role: "user",
+        content:
+          "El administrador gestiona los usuarios de su sucursal y supervisa las ventas diarias. Listo con el rol del administrador, hablemos ahora del directivo.",
+      },
+    ];
+    const focusShift = await callModelDirect(
+      anthropic,
+      model,
+      stakeholdersSystem,
+      followupCoherenceMessages,
+    );
+    const fups = focusShift.payload.suggested_followups;
+    check(fups.length <= 4, `suggested_followups respeta el máximo 4 (recibidos: ${fups.length})`);
+    // Heurística: contar followups que mencionan SOLO admin sin tocar directivo.
+    const stragglers = fups.filter(
+      (f) => /administrador/i.test(f) && !/directiv/i.test(f),
+    );
+    check(
+      stragglers.length === 0,
+      `Ningún followup queda sobre 'administrador' tras el cambio de foco a directivo (stragglers=${stragglers.length}: ${stragglers.join(" | ") || "ninguno"})`,
+    );
+    const stragglersFromQuestion = /directiv/i.test(focusShift.payload.question);
+    check(
+      stragglersFromQuestion,
+      `La 'question' principal del turno menciona el nuevo foco 'directivo'`,
+    );
+
+    console.log(
+      paint(
+        "\n[8/8] Regresión: salto deja turno meta, contexto del modelo NO debe romperse",
         "cyan",
       ),
     );

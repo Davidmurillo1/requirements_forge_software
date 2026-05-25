@@ -50,7 +50,7 @@ export type ExtractedFact = z.infer<typeof factSchema>;
 
 export const submitTurnPayloadSchema = z.object({
   question: z.string().min(1).max(3000),
-  suggested_followups: z.array(z.string().min(1).max(300)).max(6).default([]),
+  suggested_followups: z.array(z.string().min(1).max(300)).max(4).default([]),
   detected_issues: z.array(detectedIssueSchema).max(10).default([]),
   section_advance: sectionAdvanceSchema.default({
     complete: false,
@@ -81,9 +81,10 @@ export const SUBMIT_TURN_TOOL: SubmitTurnTool = {
       },
       suggested_followups: {
         type: "array",
+        maxItems: 4,
         items: { type: "string" },
         description:
-          "Hasta 6 sub-preguntas o aclaraciones opcionales que el consultor podría usar si necesita profundizar. Vacío si no aplica.",
+          "Hasta 4 SUB-preguntas de la 'question' principal de ESTE turno. NO es una pila de pendientes: si la 'question' cambió de foco respecto al turno anterior, los followups deben seguir el nuevo foco. Si no tienes followups coherentes, devuelve [].",
       },
       detected_issues: {
         type: "array",
