@@ -74,4 +74,4 @@
   - `c31afc2` feat(ai): add Anthropic client, prompts and turn context builder
   - `48229dd` feat(server): add elicitation server actions
   - `7954d15` feat(ui): add minimal elicitation chat UI
-- [ ] 9.2 Tras aprobación y merge, ejecutar `openspec archive add-elicitation-engine` para fusionar el delta al spec principal. **Pendiente del usuario** — el archivar reescribe `openspec/specs/elicitation-engine/spec.md` y debe pasar por tu revisión.
+- [x] 9.2 Tras aprobación del usuario, ejecutar el workflow `/opsx:archive`: sync del delta al spec canónico (`openspec/specs/elicitation-engine/spec.md` ahora contiene los 5 requirements originales + los 7 ADDED del delta) y mover la carpeta a `openspec/changes/archive/2026-05-24-add-elicitation-engine/`.
