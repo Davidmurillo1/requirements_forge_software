@@ -1,6 +1,8 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
+import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import type { Database } from "@/lib/db/types";
@@ -53,6 +55,7 @@ export function IssuePanel({ issues }: { issues: Issue[] }) {
 }
 
 function IssueCard({ issue }: { issue: Issue }) {
+  const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
@@ -60,12 +63,29 @@ function IssueCard({ issue }: { issue: Issue }) {
     startTransition(async () => {
       setError(null);
       const result = await resolveIssue({ issueId: issue.id, action });
-      if (!result.ok) setError(result.error.message);
+      if (!result.ok) {
+        setError(result.error.message);
+        toast.error(
+          action === "resolve" ? "No se pudo resolver" : "No se pudo descartar",
+          { description: result.error.message },
+        );
+        return;
+      }
+      toast.success(
+        action === "resolve" ? "Hallazgo resuelto" : "Hallazgo descartado",
+        { description: issue.title },
+      );
+      // revalidatePath del servidor no siempre re-renderiza un client
+      // component automáticamente: forzamos refresh del RSC desde el cliente.
+      router.refresh();
     });
   }
 
   return (
-    <article className={`rounded-md border p-3 text-sm ${SEVERITY_STYLE[issue.severity]}`}>
+    <article
+      className={`rounded-md border p-3 text-sm transition-opacity ${SEVERITY_STYLE[issue.severity]} ${pending ? "pointer-events-none opacity-50" : ""}`}
+      aria-busy={pending}
+    >
       <p className="mb-1 flex items-center justify-between text-xs uppercase tracking-wide text-muted-foreground">
         <span>{TYPE_LABEL[issue.type]}</span>
         <span>{issue.severity}</span>
@@ -74,7 +94,7 @@ function IssueCard({ issue }: { issue: Issue }) {
       <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{issue.body}</p>
       <div className="mt-2 flex gap-2">
         <Button size="sm" variant="outline" disabled={pending} onClick={() => act("resolve")}>
-          Resolver
+          {pending ? "Procesando…" : "Resolver"}
         </Button>
         <Button size="sm" variant="ghost" disabled={pending} onClick={() => act("dismiss")}>
           Descartar

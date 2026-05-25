@@ -1,6 +1,8 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useTransition } from "react";
+import { toast } from "sonner";
 
 import { SECTION_ORDER, SECTION_TITLES } from "@/lib/ai/prompts/sections";
 import type { Database } from "@/lib/db/types";
@@ -25,13 +27,20 @@ export function SectionSelector({
   currentSection: Section;
   progress: Record<string, { status: SectionStatus; completion_score: number }>;
 }) {
+  const router = useRouter();
   const [pending, startTransition] = useTransition();
 
   function onChange(e: React.ChangeEvent<HTMLSelectElement>) {
     const section = e.target.value as Section;
     if (section === currentSection) return;
     startTransition(async () => {
-      await jumpToSection({ sessionId, section });
+      const result = await jumpToSection({ sessionId, section });
+      if (!result.ok) {
+        toast.error("No se pudo saltar de sección", { description: result.error.message });
+        return;
+      }
+      toast.success(`Sección activa: ${SECTION_TITLES[section]}`);
+      router.refresh();
     });
   }
 

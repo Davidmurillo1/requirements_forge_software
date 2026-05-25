@@ -1,11 +1,14 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
+import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { retryFailedTurn } from "@/server/elicitation";
 
 export function RetryTurnButton({ sessionId }: { sessionId: string }) {
+  const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   return (
@@ -18,7 +21,13 @@ export function RetryTurnButton({ sessionId }: { sessionId: string }) {
           startTransition(async () => {
             setError(null);
             const result = await retryFailedTurn({ sessionId });
-            if (!result.ok) setError(result.error.message);
+            if (!result.ok) {
+              setError(result.error.message);
+              toast.error("Reintento falló", { description: result.error.message });
+              return;
+            }
+            toast.success("Reintento OK");
+            router.refresh();
           })
         }
       >

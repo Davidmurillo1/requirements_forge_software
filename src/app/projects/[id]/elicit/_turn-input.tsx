@@ -1,11 +1,14 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useRef, useState, useTransition } from "react";
+import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { sendTurn } from "@/server/elicitation";
 
 export function TurnInput({ sessionId }: { sessionId: string }) {
+  const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [text, setText] = useState("");
@@ -29,10 +32,14 @@ export function TurnInput({ sessionId }: { sessionId: string }) {
       });
       if (!result.ok) {
         setError(result.error.message);
+        toast.error("No se pudo enviar el turno", {
+          description: result.error.message,
+        });
         return;
       }
       setText("");
       formRef.current?.reset();
+      router.refresh();
     });
   }
 
